@@ -228,7 +228,7 @@ function importStudentsBatch(students) {
 }
 
 function getGradesForStudent(studentNisn) {
-  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Diperbarui'];
+  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Halaman Selesai', 'Diperbarui'];
   var sheet = getOrCreateSheet(SCRIPT_CONFIG.TAB_REKAP, headers);
   var data = sheet.getDataRange().getValues();
   var list = [];
@@ -248,7 +248,8 @@ function getGradesForStudent(studentNisn) {
         kuisAkhirScore: data[i][7] === '' ? null : Number(data[i][7]),
         finalScore: data[i][8] === '' ? null : Number(data[i][8]),
         predicate: data[i][9] || '',
-        updatedAt: data[i][10] || ''
+        completedPages: data[i][10] === '' ? 1 : Number(data[i][10]),
+        updatedAt: data[i][11] || ''
       });
     }
   }
@@ -256,7 +257,7 @@ function getGradesForStudent(studentNisn) {
 }
 
 function getAllGradesRecap() {
-  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Diperbarui'];
+  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Halaman Selesai', 'Diperbarui'];
   var sheet = getOrCreateSheet(SCRIPT_CONFIG.TAB_REKAP, headers);
   var data = sheet.getDataRange().getValues();
   var list = [];
@@ -274,7 +275,8 @@ function getAllGradesRecap() {
         kuisAkhirScore: data[i][7] === '' ? null : Number(data[i][7]),
         finalScore: data[i][8] === '' ? null : Number(data[i][8]),
         predicate: data[i][9] || '',
-        updatedAt: data[i][10] || ''
+        completedPages: data[i][10] === '' ? 1 : Number(data[i][10]),
+        updatedAt: data[i][11] || ''
       });
     }
   }
@@ -282,7 +284,7 @@ function getAllGradesRecap() {
 }
 
 function saveOrUpdateGrade(grade) {
-  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Diperbarui'];
+  var headers = ['NISN', 'Nama', 'Kelas', 'Mata Pelajaran', 'ID Materi', 'Materi', 'Uji Pemahaman', 'Kuis Akhir', 'Nilai Akhir', 'Predikat', 'Halaman Selesai', 'Diperbarui'];
   var sheet = getOrCreateSheet(SCRIPT_CONFIG.TAB_REKAP, headers);
   var data = sheet.getDataRange().getValues();
   
@@ -295,19 +297,22 @@ function saveOrUpdateGrade(grade) {
     if (rowNisn === targetNisn && rowMatId === targetMatId) {
       var prevFinal = Number(data[i][8]) || 0;
       var newFinal = Number(grade.finalScore) || 0;
-      // Nilai tidak pernah turun: simpan nilai tertinggi
       if (newFinal >= prevFinal) {
         sheet.getRange(i + 1, 7).setValue(grade.ujiPemahamanScore != null ? grade.ujiPemahamanScore : '');
         sheet.getRange(i + 1, 8).setValue(grade.kuisAkhirScore != null ? grade.kuisAkhirScore : '');
         sheet.getRange(i + 1, 9).setValue(grade.finalScore != null ? grade.finalScore : '');
         sheet.getRange(i + 1, 10).setValue(grade.predicate || '');
-        sheet.getRange(i + 1, 11).setValue(new Date().toISOString());
       }
+      var prevPages = Number(data[i][10]) || 1;
+      var newPages = Number(grade.completedPages) || 1;
+      var maxPages = Math.max(prevPages, newPages);
+      sheet.getRange(i + 1, 11).setValue(maxPages);
+      sheet.getRange(i + 1, 12).setValue(grade.updatedAt || new Date().toISOString());
       return;
     }
   }
 
-  // Not found, append new row
+  // Append new row
   sheet.appendRow([
     grade.nisn,
     grade.nama,
@@ -319,30 +324,30 @@ function saveOrUpdateGrade(grade) {
     grade.kuisAkhirScore != null ? grade.kuisAkhirScore : '',
     grade.finalScore != null ? grade.finalScore : '',
     grade.predicate || '',
-    new Date().toISOString()
+    grade.completedPages || 1,
+    grade.updatedAt || new Date().toISOString()
   ]);
 }
 
-function uploadToDrive(filename, mimeType, base64Data) {
+function uploadToDrive(filename, mimeType, base64) {
   var folder;
   if (SCRIPT_CONFIG.DRIVE_FOLDER_ID) {
     folder = DriveApp.getFolderById(SCRIPT_CONFIG.DRIVE_FOLDER_ID);
   } else {
     folder = DriveApp.getRootFolder();
   }
-  var decoded = Utilities.base64Decode(base64Data);
-  var blob = Utilities.newBlob(decoded, mimeType, filename);
+  var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, filename);
   var file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return {
-    fileId: file.getId(),
-    fileName: file.getName(),
-    viewUrl: file.getUrl()
-  };
+  return { fileId: file.getId(), url: file.getUrl() };
 }
 
 function deleteFromDrive(fileId) {
-  DriveApp.getFileById(fileId).setTrashed(true);
+  try {
+    var file = DriveApp.getFileById(fileId);
+    file.setTrashed(true);
+  } catch (e) {
+    // ignore
+  }
 }
 `;
 }

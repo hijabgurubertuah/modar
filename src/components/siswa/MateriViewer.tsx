@@ -7,7 +7,16 @@ import { GlassCard } from '../common/GlassCard';
 import { UjiPemahaman } from './UjiPemahaman';
 import { GameViewer } from './GameViewer';
 import { KuisAkhirCBT } from './KuisAkhirCBT';
-import { isMaterialUnlocked, setMaterialUnlocked, setLastOpenedSubjectPage, getLastOpenedSubjectPage } from '../../services/storage';
+import { ImageViewer } from '../common/ImageViewer';
+import {
+  isMaterialUnlocked,
+  setMaterialUnlocked,
+  setLastOpenedSubjectPage,
+  getLastOpenedSubjectPage,
+  isUjiAnsweredCorrectly,
+  getCompletedPages,
+  setCompletedPages,
+} from '../../services/storage';
 
 interface MateriViewerProps {
   materialId?: string;
@@ -20,7 +29,7 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
   uniqueId,
   isPreview = false,
 }) => {
-  const { session, materials, pages, cmsSettings, showToast } = useApp();
+  const { session, materials, pages, cmsSettings } = useApp();
   const studentNisn = session?.nisn || 'guest';
   const studentGrade = session?.gradeLevel;
 
@@ -36,13 +45,16 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
         .sort((a, b) => a.pageNumber - b.pageNumber)
     : [];
 
-  // Determine initial page number from saved state or default to 1
+  // Determine initial page number
   const savedHistory = material ? getLastOpenedSubjectPage(studentNisn, material.subject) : null;
   const initialPage = savedHistory?.materialId === material?.id && savedHistory?.pageNumber
     ? Math.min(savedHistory.pageNumber, matPages.length || 1)
     : 1;
 
   const [currentPageNum, setCurrentPageNum] = useState<number>(initialPage);
+
+  // Full-screen image viewer state
+  const [viewerImgSrc, setViewerImgSrc] = useState<string | null>(null);
 
   // Password Unlock State
   const isUnlockedInitial = material
@@ -57,7 +69,6 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
   const [passwordAttempts, setPasswordAttempts] = useState(0);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
-  // Sync unlocked state if material changes
   useEffect(() => {
     if (material) {
       const unlocked = !material.password || isPreview || isMaterialUnlocked(studentNisn, material.id);
@@ -68,7 +79,6 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     }
   }, [material, studentNisn, isPreview]);
 
-  // Lockout countdown
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (lockoutSeconds > 0) {
@@ -79,14 +89,33 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
 
-  // Save last opened page in subject
   useEffect(() => {
     if (material && !isPreview && studentNisn) {
       setLastOpenedSubjectPage(studentNisn, material.subject, material.id, currentPageNum);
     }
   }, [material, currentPageNum, studentNisn, isPreview]);
 
-  // Handle password unlock submission
+  // Check if page is unlocked according to sequential locking rules
+  const isPageUnlocked = (pageNum: number) => {
+    if (isPreview || !material || material.pageLockEnabled === false) return true;
+    if (pageNum === 1) return true;
+
+    // Check if all previous pages are completed
+    const savedCompleted = getCompletedPages(studentNisn, material.id);
+    if (pageNum <= savedCompleted) return true;
+
+    for (let i = 1; i < pageNum; i++) {
+      const prevPage = matPages.find((p) => p.pageNumber === i);
+      if (!prevPage) continue;
+      const isCompleted =
+        prevPage.type !== 'Materi' ||
+        !prevPage.ujiPemahaman?.enabled ||
+        isUjiAnsweredCorrectly(studentNisn, prevPage.id);
+      if (!isCompleted) return false;
+    }
+    return true;
+  };
+
   const handleUnlockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutSeconds > 0) return;
@@ -115,10 +144,9 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     }
   };
 
-  // Condition 1: Material not found or hidden
   if (!material || (!isPreview && material.status === 'Sembunyi')) {
     return (
-      <div className="w-full max-w-[820px] mx-auto py-12 flex justify-center">
+      <div className="w-full max-w-[820px] mx-auto py-12 px-4 flex justify-center">
         <GlassCard className="p-8 text-center text-[#A5D8D3]/80">
           <p className="text-base font-semibold">
             {cmsSettings.textsAndMessages.materialUnavailable}
@@ -128,10 +156,9 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     );
   }
 
-  // Condition 2: Material is for different grade level
   if (!isPreview && studentGrade && material.grade !== studentGrade) {
     return (
-      <div className="w-full max-w-[820px] mx-auto py-12 flex justify-center">
+      <div className="w-full max-w-[820px] mx-auto py-12 px-4 flex justify-center">
         <GlassCard className="p-8 text-center text-[#A5D8D3]/80">
           <p className="text-base font-semibold">
             {cmsSettings.textsAndMessages.wrongGradeText}
@@ -141,11 +168,9 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     );
   }
 
-  // Condition 3: Locked material
   if (!isUnlocked) {
     return (
-      <div className="w-full max-w-[820px] mx-auto py-16 flex flex-col items-center justify-center">
-        {/* If modal is closed, show big lock icon */}
+      <div className="w-full max-w-[820px] mx-auto py-16 px-4 flex flex-col items-center justify-center">
         {!showPasswordModal ? (
           <button
             type="button"
@@ -160,7 +185,6 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
             </span>
           </button>
         ) : (
-          /* Password Modal */
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-[6px]">
             <GlassCard className="w-full max-w-[360px] p-6 flex flex-col gap-4 text-center">
               <div className="w-12 h-12 rounded-full bg-[#FBBF24]/20 text-[#FBBF24] flex items-center justify-center mx-auto">
@@ -221,33 +245,51 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
     );
   }
 
-  // Active page
   const activePage = matPages.find((p) => p.pageNumber === currentPageNum) || matPages[0];
   const isLastPage = activePage ? activePage.pageNumber === matPages.length : true;
 
   return (
-    <div className="w-full max-w-[820px] mx-auto flex flex-col gap-1.5 pb-8">
-      {/* Numbered Page Tabs Bar (Always fully visible, auto-wraps cleanly without horizontal scroll) */}
+    <div className="w-full max-w-[820px] mx-auto flex flex-col gap-2 pb-8 px-4 sm:px-6 md:px-8">
+      {/* Numbered Page Tabs Bar */}
       {matPages.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-1 w-full px-1 py-1">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 w-full py-1">
           {matPages.map((page) => {
             const isTabActive = page.pageNumber === currentPageNum;
+            const unlocked = isPageUnlocked(page.pageNumber);
+            const lockedBg = cmsSettings.materialDisplay.tabLockedColor || 'rgba(15, 118, 110, 0.20)';
+            const lockedOpacity = cmsSettings.materialDisplay.tabLockedOpacity ?? 0.5;
 
             return (
               <button
                 key={page.id}
                 type="button"
                 onClick={() => {
+                  if (!unlocked) {
+                    if ('vibrate' in navigator) navigator.vibrate(200);
+                    return;
+                  }
                   setCurrentPageNum(page.pageNumber);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className={`h-9 rounded-[12px] text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center select-none ${
+                className={`relative h-9 rounded-[12px] text-sm font-bold transition-all duration-200 cursor-pointer flex items-center justify-center select-none ${
                   isTabActive
                     ? 'w-[68px] bg-[#2DD4BF]/60 text-[#ECFEFF] border border-[#2DD4BF] shadow-[0_0_12px_rgba(45,212,191,0.3)]'
-                    : 'w-[42px] min-w-[32px] bg-[#0F766E]/40 hover:bg-[#0F766E]/60 text-[#A5D8D3] border border-white/15'
+                    : unlocked
+                    ? 'w-[42px] bg-[#0F766E]/40 hover:bg-[#0F766E]/60 text-[#A5D8D3] border border-white/15'
+                    : 'w-[42px] text-[#A5D8D3]/70 border border-white/10'
                 }`}
+                style={
+                  !unlocked
+                    ? { backgroundColor: lockedBg, opacity: lockedOpacity }
+                    : undefined
+                }
               >
-                {page.pageNumber}
+                <span>{page.pageNumber}</span>
+                {!unlocked && (
+                  <span className="absolute top-1 right-1 text-[#FBBF24]">
+                    <Lock size={10} />
+                  </span>
+                )}
               </button>
             );
           })}
@@ -258,12 +300,10 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
       {activePage ? (
         <GlassCard
           isReadingArea={activePage.type === 'Materi'}
-          className="p-4 sm:p-7 flex flex-col text-[#ECFEFF] transition-all duration-200"
+          className="p-5 sm:p-8 flex flex-col text-[#ECFEFF] transition-all duration-200"
         >
-          {/* Page Type: Materi */}
           {activePage.type === 'Materi' && (
             <div className="flex flex-col gap-5 leading-[1.7]">
-              {/* Blocks */}
               {activePage.blocks.map((block) => {
                 if (block.type === 'text') {
                   if (block.textStyle === 'title') {
@@ -284,14 +324,14 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
                     return (
                       <blockquote
                         key={block.id}
-                        className="pl-4 border-l-4 border-[#2DD4BF] text-base italic text-[#A5D8D3] bg-black/15 p-3 rounded-r-xl"
+                        className="pl-4 border-l-4 border-[#2DD4BF] text-base italic text-[#A5D8D3] bg-black/15 p-3 rounded-r-xl text-justify hyphens-auto"
                       >
                         {block.content}
                       </blockquote>
                     );
                   }
                   return (
-                    <p key={block.id} className="text-base sm:text-[17px] text-[#ECFEFF]/95">
+                    <p key={block.id} className="text-base sm:text-[17px] text-[#ECFEFF]/95 text-justify hyphens-auto">
                       {block.content}
                     </p>
                   );
@@ -299,11 +339,15 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
 
                 if (block.type === 'image' && block.imageSrc) {
                   return (
-                    <div key={block.id} className="my-2 rounded-2xl overflow-hidden border border-white/20 bg-black/20">
+                    <div
+                      key={block.id}
+                      className="my-3 rounded-2xl overflow-hidden border border-white/20 bg-black/25 flex justify-center cursor-zoom-in"
+                      onClick={() => setViewerImgSrc(block.imageSrc!)}
+                    >
                       <img
                         src={block.imageSrc}
                         alt=""
-                        className="w-full max-h-[460px] object-contain"
+                        className="max-w-full max-h-[460px] object-contain mx-auto block"
                       />
                     </div>
                   );
@@ -357,50 +401,49 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
                   );
                 }
 
-                if (block.type === 'divider') {
-                  return <hr key={block.id} className="my-4 border-white/15" />;
-                }
-
                 return null;
               })}
 
-              {/* Uji Pemahaman at the bottom of the card */}
-              {activePage.ujiPemahaman && activePage.ujiPemahaman.enabled && (
+              {/* Uji Pemahaman Component */}
+              {activePage.ujiPemahaman?.enabled && (
                 <UjiPemahaman
                   data={activePage.ujiPemahaman}
                   pageId={activePage.id}
                   materialId={material.id}
                   isLastPage={isLastPage}
-                  onAdvancePage={() => {
-                    setCurrentPageNum((prev) => Math.min(matPages.length, prev + 1));
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
                   isPreview={isPreview}
+                  onAdvancePage={() => {
+                    if (!isPreview && studentNisn) {
+                      setCompletedPages(studentNisn, material.id, Math.max(currentPageNum + 1, getCompletedPages(studentNisn, material.id)));
+                    }
+                    if (currentPageNum < matPages.length) {
+                      setCurrentPageNum(currentPageNum + 1);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  onImageViewerOpen={(src) => setViewerImgSrc(src)}
                 />
               )}
             </div>
           )}
 
-          {/* Page Type: Game */}
           {activePage.type === 'Game' && (
             <GameViewer htmlCode={activePage.gameHtml} />
           )}
 
-          {/* Page Type: Kuis Akhir */}
-          {activePage.type === 'KuisAkhir' && activePage.kuisAkhir && (
+          {activePage.type === 'KuisAkhir' && (
             <KuisAkhirCBT
-              data={activePage.kuisAkhir}
+              data={activePage.kuisAkhir || { maxAttempts: 0, questions: [] }}
               materialId={material.id}
               isPreview={isPreview}
             />
           )}
         </GlassCard>
-      ) : (
-        <GlassCard className="p-8 text-center text-[#A5D8D3]/70">
-          <p className="text-base font-medium">
-            {cmsSettings.materialDisplay.emptyStateText}
-          </p>
-        </GlassCard>
+      ) : null}
+
+      {/* Full-Screen Image Viewer Modal */}
+      {viewerImgSrc && (
+        <ImageViewer src={viewerImgSrc} onClose={() => setViewerImgSrc(null)} />
       )}
     </div>
   );

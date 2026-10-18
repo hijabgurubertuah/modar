@@ -13,6 +13,7 @@ interface UjiPemahamanProps {
   isLastPage: boolean;
   onAdvancePage: () => void;
   isPreview?: boolean;
+  onImageViewerOpen?: (src: string) => void;
 }
 
 export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
@@ -22,12 +23,13 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
   isLastPage,
   onAdvancePage,
   isPreview = false,
+  onImageViewerOpen = () => {},
 }) => {
   const { session, recordUjiSuccess, cmsSettings } = useApp();
   const studentNisn = session?.nisn || 'guest';
 
-  // Check if already answered in local state
-  const alreadyAnswered = isUjiAnsweredCorrectly(studentNisn, pageId);
+  // Check if already answered in local state (ignored in preview)
+  const alreadyAnswered = !isPreview && isUjiAnsweredCorrectly(studentNisn, pageId);
 
   const [isVisible, setIsVisible] = useState(alreadyAnswered || data.delaySeconds === 0);
   const [attempts, setAttempts] = useState(1);
@@ -38,7 +40,7 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
   const [shakingOptionId, setShakingOptionId] = useState<string | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
-  // Delay before question appears (resets on page change, pauses when hidden)
+  // Delay before question appears (resets on page change or preview open)
   useEffect(() => {
     if (alreadyAnswered || data.delaySeconds === 0) {
       setIsVisible(true);
@@ -56,7 +58,7 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
     }, delayMs);
 
     return () => clearTimeout(timer);
-  }, [pageId, alreadyAnswered, data.delaySeconds, cmsSettings.ujiAndKuis.defaultUjiDelay]);
+  }, [pageId, alreadyAnswered, data.delaySeconds, cmsSettings.ujiAndKuis.defaultUjiDelay, isPreview]);
 
   if (!data.enabled || !isVisible) {
     return null;
@@ -67,7 +69,6 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
     if (wrongOptionIds.includes(optionId)) return;
 
     if (optionId === data.correctAnswerId) {
-      // Correct!
       setSelectedOptionId(optionId);
 
       if (!isPreview) {
@@ -84,7 +85,6 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
         }
       }, durationMs);
     } else {
-      // Wrong!
       setAttempts((prev) => prev + 1);
       setShakingOptionId(optionId);
       setWrongOptionIds((prev) => [...prev, optionId]);
@@ -101,15 +101,20 @@ export const UjiPemahaman: React.FC<UjiPemahamanProps> = ({
     <div className="mt-8 pt-6 border-t border-white/15 flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
       {/* Question */}
       <div className="flex flex-col gap-2">
-        <p className="text-base sm:text-lg font-semibold text-[#ECFEFF] leading-relaxed">
+        <p className="text-base sm:text-lg font-semibold text-[#ECFEFF] leading-relaxed text-justify hyphens-auto">
           {data.question}
         </p>
         {data.questionImage && (
-          <img
-            src={data.questionImage}
-            alt=""
-            className="rounded-xl max-h-56 object-contain w-fit bg-black/20"
-          />
+          <div
+            className="rounded-xl overflow-hidden max-h-56 w-fit bg-black/20 cursor-zoom-in"
+            onClick={() => onImageViewerOpen(data.questionImage!)}
+          >
+            <img
+              src={data.questionImage}
+              alt=""
+              className="max-h-56 object-contain"
+            />
+          </div>
         )}
       </div>
 

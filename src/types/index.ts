@@ -75,6 +75,7 @@ export interface Material {
   status: MaterialStatus;
   order: number;
   password?: string; // Optional password for material
+  pageLockEnabled?: boolean; // default true
   createdAt: string;
   updatedAt: string;
 }
@@ -91,6 +92,7 @@ export interface GradeRecap {
   kuisAkhirScore: number | null;
   finalScore: number | null;
   predicate: string; // A, B, C, D
+  completedPages?: number; // Halaman Selesai
   updatedAt: string;
 }
 
@@ -153,6 +155,8 @@ export interface CMSSettings {
   materialDisplay: {
     tabNormalColor: string;
     tabActiveColor: string;
+    tabLockedColor?: string;
+    tabLockedOpacity?: number;
     pagePaddingX: number; // px
     bodyFontSize: number; // px
     maxReadWidth: number; // px

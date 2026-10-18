@@ -438,6 +438,27 @@ export const AdminCMS: React.FC<AdminCMSProps> = ({
                 className="w-full h-10 px-3 rounded-xl bg-white/5 border border-white/15 text-sm"
               />
             </div>
+            <div>
+              <label className="text-xs font-semibold text-[#A5D8D3] mb-1 block">Warna Tab Terkunci</label>
+              <input
+                type="color"
+                value={draft.materialDisplay.tabLockedColor || '#0f766e'}
+                onChange={(e) => updateDraftPane('materialDisplay', { tabLockedColor: e.target.value })}
+                className="w-full h-10 rounded-xl cursor-pointer bg-transparent border border-white/15"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#A5D8D3] mb-1 block">Opasitas Tab Terkunci (0.1 - 1.0)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0.1"
+                max="1.0"
+                value={draft.materialDisplay.tabLockedOpacity ?? 0.5}
+                onChange={(e) => updateDraftPane('materialDisplay', { tabLockedOpacity: Number(e.target.value) })}
+                className="w-full h-10 px-3 rounded-xl bg-white/5 border border-white/15 text-sm"
+              />
+            </div>
           </div>
           <button
             type="button"

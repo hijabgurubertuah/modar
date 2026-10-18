@@ -203,3 +203,30 @@ export function setLastOpenedSubjectPage(studentNisn: string, subjectName: strin
     // ignore
   }
 }
+
+export function getCompletedPages(studentNisn: string, materialId: string): number {
+  try {
+    const raw = localStorage.getItem('mbd_completed_pages');
+    if (!raw) return 1;
+    const map = JSON.parse(raw);
+    const val = map[`${studentNisn}_${materialId}`];
+    return typeof val === 'number' ? val : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function setCompletedPages(studentNisn: string, materialId: string, count: number): void {
+  try {
+    const raw = localStorage.getItem('mbd_completed_pages');
+    const map = raw ? JSON.parse(raw) : {};
+    const current = map[`${studentNisn}_${materialId}`] || 1;
+    if (count > current) {
+      map[`${studentNisn}_${materialId}`] = count;
+      localStorage.setItem('mbd_completed_pages', JSON.stringify(map));
+    }
+  } catch {
+    // ignore
+  }
+}
+
