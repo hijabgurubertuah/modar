@@ -17,6 +17,7 @@ import {
   getCompletedPages,
   setCompletedPages,
 } from '../../services/storage';
+import { sanitizeHtml, convertBlocksToHtml } from '../admin/editor/editorUtils';
 
 interface MateriViewerProps {
   materialId?: string;
@@ -304,105 +305,18 @@ export const MateriViewer: React.FC<MateriViewerProps> = ({
         >
           {activePage.type === 'Materi' && (
             <div className="flex flex-col gap-5 leading-[1.7]">
-              {activePage.blocks.map((block) => {
-                if (block.type === 'text') {
-                  if (block.textStyle === 'title') {
-                    return (
-                      <h2 key={block.id} className="text-xl sm:text-2xl font-bold text-[#ECFEFF] tracking-tight">
-                        {block.content}
-                      </h2>
-                    );
+              <div
+                className="prose max-w-none text-[#ECFEFF]"
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.tagName === 'IMG') {
+                    setViewerImgSrc((target as HTMLImageElement).src);
                   }
-                  if (block.textStyle === 'subtitle') {
-                    return (
-                      <h3 key={block.id} className="text-lg sm:text-xl font-semibold text-[#2DD4BF]">
-                        {block.content}
-                      </h3>
-                    );
-                  }
-                  if (block.textStyle === 'quote') {
-                    return (
-                      <blockquote
-                        key={block.id}
-                        className="pl-4 border-l-4 border-[#2DD4BF] text-base italic text-[#A5D8D3] bg-black/15 p-3 rounded-r-xl text-justify hyphens-auto"
-                      >
-                        {block.content}
-                      </blockquote>
-                    );
-                  }
-                  return (
-                    <p key={block.id} className="text-base sm:text-[17px] text-[#ECFEFF]/95 text-justify hyphens-auto">
-                      {block.content}
-                    </p>
-                  );
-                }
-
-                if (block.type === 'image' && block.imageSrc) {
-                  return (
-                    <div
-                      key={block.id}
-                      className="my-3 rounded-2xl overflow-hidden border border-white/20 bg-black/25 flex justify-center cursor-zoom-in"
-                      onClick={() => setViewerImgSrc(block.imageSrc!)}
-                    >
-                      <img
-                        src={block.imageSrc}
-                        alt=""
-                        className="max-w-full max-h-[460px] object-contain mx-auto block"
-                      />
-                    </div>
-                  );
-                }
-
-                if (block.type === 'video' && block.videoUrl) {
-                  return (
-                    <div key={block.id} className="my-3 aspect-video w-full rounded-2xl overflow-hidden border border-white/20 shadow-md">
-                      <iframe
-                        title="Video"
-                        src={block.videoUrl}
-                        className="w-full h-full border-none"
-                        allowFullScreen
-                      />
-                    </div>
-                  );
-                }
-
-                if (block.type === 'document' && block.docUrl) {
-                  return (
-                    <div key={block.id} className="my-3 w-full h-[500px] rounded-2xl overflow-hidden border border-white/20 shadow-md">
-                      <iframe
-                        title="Dokumen PDF"
-                        src={block.docUrl}
-                        className="w-full h-full border-none"
-                      />
-                    </div>
-                  );
-                }
-
-                if (block.type === 'table' && block.tableData) {
-                  return (
-                    <div key={block.id} className="my-3 overflow-x-auto rounded-xl border border-white/15">
-                      <table className="w-full text-left text-sm divide-y divide-white/15">
-                        <tbody>
-                          {block.tableData.map((row, rIdx) => (
-                            <tr
-                              key={rIdx}
-                              className={rIdx === 0 ? 'bg-white/10 font-bold text-[#2DD4BF]' : 'hover:bg-white/5'}
-                            >
-                              {row.map((cell, cIdx) => (
-                                <td key={cIdx} className="px-4 py-3 border-r border-white/10 last:border-none">
-                                  {cell}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                }
-
-                return null;
-              })}
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(activePage.contentHtml || convertBlocksToHtml(activePage)),
+                }}
+              />
 
               {/* Uji Pemahaman Component */}
               {activePage.ujiPemahaman?.enabled && (

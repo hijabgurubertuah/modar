@@ -35,6 +35,8 @@ import { Drawer } from '../common/Drawer';
 import { AutoResizeTextarea } from '../common/AutoResizeTextarea';
 import { MateriViewer } from '../siswa/MateriViewer';
 import { generateUniqueMaterialId } from '../../services/storage';
+import { RichTextEditor } from './editor/RichTextEditor';
+import { convertBlocksToHtml, migrateBase64InHtml } from './editor/editorUtils';
 
 interface AdminMateriProps {
   isDrawerOpen?: boolean;
@@ -291,20 +293,10 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
       materialId: selectedMaterial.id,
       pageNumber: newPageNum,
       type: 'Materi',
-      blocks: [
-        {
-          id: `b-${Date.now()}-1`,
-          type: 'text',
-          textStyle: 'title',
-          content: 'Halaman Baru',
-        },
-        {
-          id: `b-${Date.now()}-2`,
-          type: 'text',
-          textStyle: 'paragraph',
-          content: '',
-        },
-      ],
+      contentHtml: '<h1>Halaman Baru</h1><p>Materi pembelajaran...</p>',
+      contentText: 'Halaman Baru Materi pembelajaran...',
+      stats: { words: 3, characters: 33, readMinutes: 1 },
+      schemaVersion: 2,
       ujiPemahaman: {
         enabled: false,
         question: '',
@@ -322,10 +314,17 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
     setActivePageNum(newPageNum);
   };
 
-  const handleSavePage = () => {
-    if (pageDraft) {
-      savePage(pageDraft);
+  const handleSavePage = async () => {
+    if (!pageDraft) return;
+    try {
+      const migratedHtml = await migrateBase64InHtml(pageDraft.contentHtml || '');
+      const updatedDraft = { ...pageDraft, contentHtml: migratedHtml, schemaVersion: 2 as const };
+      savePage(updatedDraft);
+      setPageDraft(updatedDraft);
       setIsDraftDirty(false);
+      showToast('Perubahan berhasil disimpan');
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal menyimpan, periksa koneksi atau ukuran gambar', 'error');
     }
   };
 
@@ -406,7 +405,7 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
   };
 
   const handleUpdateBlock = (blockId: string, updates: Partial<ContentBlock>) => {
-    if (!pageDraft) return;
+    if (!pageDraft || !pageDraft.blocks) return;
     setPageDraft({
       ...pageDraft,
       blocks: pageDraft.blocks.map((b) => (b.id === blockId ? { ...b, ...updates } : b)),
@@ -508,181 +507,19 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
               <GlassCard isReadingArea={pageDraft.type === 'Materi'} className="p-4 sm:p-7 flex flex-col gap-6">
                 {pageDraft.type === 'Materi' && (
                   <div className="flex flex-col gap-5">
-                    {pageDraft.blocks.map((block) => {
-                      if (block.type === 'text') {
-                        return (
-                          <div key={block.id} className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-[#A5D8D3] uppercase font-bold tracking-wider">
-                                {block.textStyle}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const nextStyle = block.textStyle === 'title' ? 'subtitle' : block.textStyle === 'subtitle' ? 'paragraph' : block.textStyle === 'paragraph' ? 'quote' : 'title';
-                                    handleUpdateBlock(block.id, { textStyle: nextStyle });
-                                  }}
-                                  className="text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[#A5D8D3] cursor-pointer"
-                                >
-                                  Ganti Gaya
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (pageDraft.blocks.length <= 1) return;
-                                    setPageDraft({
-                                      ...pageDraft,
-                                      blocks: pageDraft.blocks.filter((b) => b.id !== block.id),
-                                    });
-                                    setIsDraftDirty(true);
-                                  }}
-                                  className="p-1 text-red-300 hover:text-red-400 cursor-pointer"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </div>
-
-                            <AutoResizeTextarea
-                              value={block.content || ''}
-                              onChange={(e) => handleUpdateBlock(block.id, { content: e.target.value })}
-                              placeholder={`Tulis ${block.textStyle}...`}
-                              className={`w-full p-3 rounded-xl bg-black/20 border border-white/15 text-[#ECFEFF] outline-none focus:border-[#2DD4BF] ${
-                                block.textStyle === 'title'
-                                  ? 'text-xl font-bold'
-                                  : block.textStyle === 'subtitle'
-                                  ? 'text-lg font-semibold text-[#2DD4BF]'
-                                  : block.textStyle === 'quote'
-                                  ? 'italic text-base'
-                                  : 'text-base'
-                              }`}
-                            />
-                          </div>
-                        );
-                      }
-
-                      if (block.type === 'image') {
-                        return (
-                          <div key={block.id} className="flex flex-col gap-2 p-3 rounded-2xl bg-black/20 border border-white/15">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-[#2DD4BF]">Gambar Isi</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPageDraft({
-                                    ...pageDraft,
-                                    blocks: pageDraft.blocks.filter((b) => b.id !== block.id),
-                                  });
-                                  setIsDraftDirty(true);
-                                }}
-                                className="p-1 text-red-300 hover:text-red-400 cursor-pointer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                            <ImageUploader
-                              value={block.imageSrc || ''}
-                              onChange={(url) => handleUpdateBlock(block.id, { imageSrc: url })}
-                            />
-                          </div>
-                        );
-                      }
-
-                      if (block.type === 'table' && block.tableData) {
-                        return (
-                          <div key={block.id} className="flex flex-col gap-2 p-3 rounded-2xl bg-black/20 border border-white/15">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-[#2DD4BF]">Tabel</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPageDraft({
-                                    ...pageDraft,
-                                    blocks: pageDraft.blocks.filter((b) => b.id !== block.id),
-                                  });
-                                  setIsDraftDirty(true);
-                                }}
-                                className="p-1 text-red-300 hover:text-red-400 cursor-pointer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                            <div className="overflow-x-auto space-y-2">
-                              {block.tableData.map((row, rIdx) => (
-                                <div key={rIdx} className="flex items-center gap-2">
-                                  {row.map((cell, cIdx) => (
-                                    <AutoResizeTextarea
-                                      key={cIdx}
-                                      value={cell}
-                                      onChange={(e) => {
-                                        const newTable = block.tableData!.map((rw, ri) =>
-                                          ri === rIdx ? rw.map((cl, ci) => (ci === cIdx ? e.target.value : cl)) : rw
-                                        );
-                                        handleUpdateBlock(block.id, { tableData: newTable });
-                                      }}
-                                      className="flex-1 p-2 rounded-lg bg-white/5 border border-white/10 text-xs text-[#ECFEFF]"
-                                    />
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return null;
-                    })}
-
-                    {/* Add Block Buttons */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newB: ContentBlock = {
-                            id: `b-${Date.now()}`,
-                            type: 'text',
-                            textStyle: 'paragraph',
-                            content: '',
-                          };
-                          setPageDraft({ ...pageDraft, blocks: [...pageDraft.blocks, newB] });
-                          setIsDraftDirty(true);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#2DD4BF] cursor-pointer"
-                      >
-                        + Teks
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newB: ContentBlock = {
-                            id: `b-${Date.now()}`,
-                            type: 'image',
-                            imageSrc: '',
-                          };
-                          setPageDraft({ ...pageDraft, blocks: [...pageDraft.blocks, newB] });
-                          setIsDraftDirty(true);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#2DD4BF] cursor-pointer"
-                      >
-                        + Gambar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newB: ContentBlock = {
-                            id: `b-${Date.now()}`,
-                            type: 'table',
-                            tableData: [['Kolom 1', 'Kolom 2'], ['Data 1', 'Data 2']],
-                          };
-                          setPageDraft({ ...pageDraft, blocks: [...pageDraft.blocks, newB] });
-                          setIsDraftDirty(true);
-                        }}
-                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-[#2DD4BF] cursor-pointer"
-                      >
-                        + Tabel
-                      </button>
-                    </div>
+                    <RichTextEditor
+                      contentHtml={pageDraft.contentHtml || convertBlocksToHtml(pageDraft)}
+                      onChange={(html, stats, plainText) => {
+                        setPageDraft({
+                          ...pageDraft,
+                          contentHtml: html,
+                          contentText: plainText,
+                          stats,
+                          schemaVersion: 2,
+                        });
+                        setIsDraftDirty(true);
+                      }}
+                    />
 
                     {/* Uji Pemahaman Editor */}
                     <div className="mt-6 pt-6 border-t border-white/20 flex flex-col gap-4">
@@ -757,7 +594,7 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
                                 <input
                                   type="radio"
                                   name={`correct-${pageDraft.id}`}
-                                  checked={pageDraft.ujiPemahaman?.correctAnswerId === opt.id}
+                                  checked={pageDraft.ujiPemahaman!.correctAnswerId === opt.id}
                                   onChange={() => {
                                     setPageDraft({
                                       ...pageDraft,
@@ -765,13 +602,13 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
                                     });
                                     setIsDraftDirty(true);
                                   }}
-                                  className="accent-[#2DD4BF]"
+                                  className="w-4 h-4 text-[#2DD4BF] bg-black/30 border-white/20 focus:ring-0 cursor-pointer"
                                 />
                                 <AutoResizeTextarea
                                   value={opt.text}
                                   onChange={(e) => {
-                                    const newOpts = pageDraft.ujiPemahaman!.options.map((o) =>
-                                      o.id === opt.id ? { ...o, text: e.target.value } : o
+                                    const newOpts = pageDraft.ujiPemahaman!.options.map((o, idx) =>
+                                      idx === oIdx ? { ...o, text: e.target.value } : o
                                     );
                                     setPageDraft({
                                       ...pageDraft,
@@ -780,7 +617,7 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
                                     setIsDraftDirty(true);
                                   }}
                                   placeholder={`Pilihan ${String.fromCharCode(65 + oIdx)}`}
-                                  className="flex-1 p-2 rounded-xl bg-white/5 border border-white/15 text-xs text-[#ECFEFF]"
+                                  className="flex-1 p-2.5 rounded-xl bg-black/20 border border-white/15 text-xs text-[#ECFEFF] outline-none focus:border-[#2DD4BF]"
                                 />
                               </div>
                             ))}

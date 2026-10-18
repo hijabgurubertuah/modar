@@ -60,7 +60,16 @@ export interface MaterialPage {
   materialId: string;
   pageNumber: number; // 1-indexed
   type: PageType;
-  blocks: ContentBlock[];
+  title?: string;
+  contentHtml?: string;
+  contentText?: string;
+  stats?: {
+    words: number;
+    characters: number;
+    readMinutes: number;
+  };
+  schemaVersion?: number; // 1 = blocks, 2 = contentHtml
+  blocks?: ContentBlock[]; // Backward compatibility / migration
   ujiPemahaman?: UjiPemahamanData;
   gameHtml?: string;
   kuisAkhir?: FinalQuizData;
