@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Materials: public read for students, write allowed
+    match /materials/{materialId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Pages: public read for students, write allowed
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Settings: public read for CMS/Grade settings, write allowed
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "Material": {
+      "title": "Material",
+      "description": "Learning material entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uniqueId": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "grade": { "type": "string" },
+        "status": { "type": "string" },
+        "order": { "type": "number" },
+        "password": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "uniqueId", "title", "subject", "grade", "status", "order"]
+    },
+    "Page": {
+      "title": "Page",
+      "description": "Material page entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "materialId": { "type": "string" },
+        "pageNumber": { "type": "number" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "materialId", "pageNumber", "type"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "App settings entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      },
+      "required": ["id"]
+    }
+  },
+  "firestore": {
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "Collection of learning materials"
+    },
+    "/pages/{pageId}": {
+      "schema": "Page",
+      "description": "Collection of material pages"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "App settings"
+    }
+  }
+}

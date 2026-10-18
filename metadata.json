@@ -1,0 +1,6 @@
+{
+  "name": "Modul Belajar Daring - SMP NEGERI 1 BENGKALIS",
+  "description": "Media pembelajaran daring resmi SMP NEGERI 1 BENGKALIS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
