@@ -621,6 +621,21 @@ export const AdminMateri: React.FC<AdminMateriProps> = ({ isDrawerOpen = false, 
                                 />
                               </div>
                             ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newOpts = [...pageDraft.ujiPemahaman!.options, { id: `opt-${Date.now()}`, text: '' }];
+                                setPageDraft({
+                                  ...pageDraft,
+                                  ujiPemahaman: { ...pageDraft.ujiPemahaman!, options: newOpts },
+                                });
+                                setIsDraftDirty(true);
+                              }}
+                              className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[#2DD4BF] hover:text-[#ECFEFF] cursor-pointer"
+                            >
+                              <Plus size={14} />
+                              <span>Tambah Pilihan</span>
+                            </button>
                           </div>
                         </div>
                       )}

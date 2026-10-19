@@ -158,12 +158,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     <div
       className={`flex flex-col rounded-2xl bg-black/25 border border-white/15 overflow-hidden transition-all shadow-lg ${
         isFullscreen
-          ? 'fixed inset-0 z-50 rounded-none bg-[#073D39] p-4 max-w-none h-screen'
+          ? 'fixed inset-0 z-50 rounded-none bg-white max-w-none h-screen'
           : 'w-full min-h-[360px]'
       }`}
     >
       {/* Sticky Toolbar */}
-      <div className="flex items-center justify-between border-b border-white/15 bg-[#073D39]/95">
+      <div className={`flex items-center justify-between border-b border-white/15 bg-[#073D39]/95 ${isFullscreen ? 'sticky top-0 z-30' : ''}`}>
         <EditorToolbar
           editor={editor}
           onOpenLinkModal={() => setIsLinkModalOpen(true)}
