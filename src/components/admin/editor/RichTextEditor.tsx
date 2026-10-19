@@ -189,7 +189,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       </div>
 
       {/* Editor Content Area - Clean with NO focus outline/box around text */}
-      <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white text-slate-900 outline-none border-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus-within:outline-none">
+      <div className={`flex-1 overflow-y-auto bg-white text-slate-900 outline-none border-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus-within:outline-none ${isFullscreen ? 'p-0' : 'p-4 sm:p-6'}`}>
         <EditorContent editor={editor} />
       </div>
 
