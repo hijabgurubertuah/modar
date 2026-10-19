@@ -150,7 +150,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
       ref={editorContainerRef}
       className={`flex flex-col overflow-hidden transition-all shadow-lg ${
         isFullscreen
-          ? 'fixed inset-0 z-[9999] rounded-none bg-white h-dvh w-screen p-0'
+          ? 'fixed inset-0 z-[9999] rounded-none bg-white h-dvh w-screen p-0 pt-14 pb-12'
           : 'w-full min-h-[360px] rounded-2xl bg-black/25 border border-white/15'
       }`}
     >
