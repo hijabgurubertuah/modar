@@ -1,6 +1,6 @@
 // ATURAN BAKU: lihat designSystem. UI harus selalu minimalis, bersih, dan tanpa teks petunjuk.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -23,6 +23,7 @@ import CharacterCount from '@tiptap/extension-character-count';
 import Placeholder from '@tiptap/extension-placeholder';
 
 import { EditorToolbar } from './EditorToolbar';
+import { useEditorFullscreen } from '../../../hooks/useEditorFullscreen';
 import { LinkModal } from './LinkModal';
 import { ImageModal } from './ImageModal';
 import { VideoModal } from './VideoModal';
@@ -44,12 +45,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, toggleFullscreen } = useEditorFullscreen(editorContainerRef);
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable heading and blockquote as per revision requirement
         heading: false,
         blockquote: false,
       }),
@@ -141,55 +143,37 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [contentHtml, editor]);
 
-  // Handle escape key for fullscreen
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
   const currentStats = calculateStats(editor?.getHTML() || contentHtml);
 
   return (
     <div
-      className={`flex flex-col rounded-2xl bg-black/25 border border-white/15 overflow-hidden transition-all shadow-lg ${
+      ref={editorContainerRef}
+      className={`flex flex-col overflow-hidden transition-all shadow-lg ${
         isFullscreen
-          ? 'fixed inset-0 z-50 rounded-none bg-white max-w-none h-screen'
-          : 'w-full min-h-[360px]'
+          ? 'fixed inset-0 z-[9999] rounded-none bg-white h-dvh w-screen p-0'
+          : 'w-full min-h-[360px] rounded-2xl bg-black/25 border border-white/15'
       }`}
     >
       {/* Sticky Toolbar */}
-      <div className={`flex items-center justify-between border-b border-white/15 bg-[#073D39]/95 ${isFullscreen ? 'sticky top-0 z-30' : ''}`}>
+      <div className={`flex items-center justify-between border-b border-white/15 bg-[#073D39]/95 ${isFullscreen ? 'sticky top-0 z-[100]' : ''}`}>
         <EditorToolbar
           editor={editor}
           onOpenLinkModal={() => setIsLinkModalOpen(true)}
           onOpenImageModal={() => setIsImageModalOpen(true)}
           onOpenVideoModal={() => setIsVideoModalOpen(true)}
-          onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+          onToggleFullscreen={toggleFullscreen}
         />
-        {isFullscreen && (
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(false)}
-            className="mr-3 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-[#ECFEFF] flex items-center gap-1.5 cursor-pointer"
-          >
-            <Minimize size={14} />
-            <span>Keluar Layar Penuh</span>
-          </button>
-        )}
       </div>
 
       {/* Table Controls (if table active) */}
-      <div className="px-3 pt-2">
-        <TableControls editor={editor} />
-      </div>
+      {!isFullscreen && (
+        <div className="px-3 pt-2">
+          <TableControls editor={editor} />
+        </div>
+      )}
 
       {/* Editor Content Area - Clean with NO focus outline/box around text */}
-      <div className={`flex-1 overflow-y-auto bg-white text-slate-900 outline-none border-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus-within:outline-none ${isFullscreen ? 'p-0' : 'p-4 sm:p-6'}`}>
+      <div className={`flex-1 overflow-y-auto bg-white text-slate-900 outline-none border-none ring-0 shadow-none focus:outline-none focus:ring-0 focus:border-none focus-within:outline-none ${isFullscreen ? 'p-4' : 'p-4 sm:p-6'}`}>
         <EditorContent editor={editor} />
       </div>
 
